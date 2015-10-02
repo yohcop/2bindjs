@@ -1,8 +1,11 @@
 // TODO: scopes. Being able to use higher scopes
-// TODO: loop indices, other made up variables?
-// TODO: functions to format text content or change other attributes
-// based on value (e.g. set brand in data-brand)
-// TODO: chance to change 'bind' to something else.
+// TODO: loop indices, other made up variables? Note that this is not
+// trivial since when arrays are spliced, we only re-render the new
+// elements for example, not all of them. But indices can change.
+// If the array isn't mutable, then it's possible to get the index
+// with a formatter (basically index=key)
+// TODO: chance to change 'bind' to something else in data attributes
+// names.
 
 var defaultFormatters = {
   'txt': function(el, value, data, key) {
