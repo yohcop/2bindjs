@@ -1,0 +1,195 @@
+<html>
+<head>
+</head>
+<body>
+
+<div id="root">
+  <p>
+    Name:
+    <span data-bind="color" data-bindformat="color">
+      <span data-bind="name"></span>
+    </span>
+    (should be <span data-bind="color" data-bindformat="color,txt"></span>)
+  </p>
+  <p>Edit name: <input data-bind="name"></input></p>
+
+  <p>Division: <span data-bind="div"></span></p>
+  <div>
+    <button onclick="addDiv()">Add division</button>
+    <button onclick="removeDiv()">Remove division</button>
+    <button onclick="otherDiv()">Other division</button>
+  </div>
+
+
+  <template id="team">
+    <span data-bind="name"></span>, coached by
+    <span data-bind="coach"></span>
+    (change team to: <input data-bind="name">)
+  </template>
+  <p>Team: (object) <span data-bind="team" data-bindtpl="#team"></span></p>
+  <div>
+    <button onclick="changeCoach()">Change coach</button>
+    <button onclick="changeTeam()">Change team</button>
+  </div>
+
+
+  <p>Bikes: (array of objects)</p>
+  <div>
+    <button onclick="addBike()">Add bike</button>
+    <button onclick="removeBike()">Remove bike</button>
+    <button onclick="changeBike()">Change bike</button>
+    <button onclick="changeBikes()">Change bikes</button>
+  </div>
+  <template id="bike">
+    <li>
+      <span data-bind="brand" data-bindformat="caps"></span>
+      <i data-bind="model" data-bindformat="txt,log"></i>
+      <input data-bind="model">
+    </li>
+  </template>
+  <ul data-bind="bikes" data-bindtpl="#bike"></ul>
+
+  <p>Results: (array of strings)</p>
+  <div>
+    <button onclick="addResult()">Add result</button>
+    <button onclick="changeResult()">Change result</button>
+    <button onclick="changeResults()">Change results</button>
+    <button onclick="removeResult()">Remove result</button>
+  </div>
+  <template id="result">
+    <li>
+      <span data-bindval data-bindformat="txt,first"></span>
+      <input data-bindval>
+    </li>
+  </template>
+  <ul data-bind="results" data-bindtpl="#result"></ul>
+
+  <p>Splits: (array of arrays)</p>
+  <template id="array2">
+    <span data-bindval data-bindformat="txtsep"></span>
+  </template>
+  <template id="array1">
+    <li data-bindval data-bindtpl="#array2"></li>
+  </template>
+  <ul data-bind="splits" data-bindtpl="#array1"></ul>
+
+  <pre id="json"></pre>
+</div>
+
+
+<script src="2bind.js"></script>
+<script>
+
+var d = {
+  'name': 'Theo',
+  'team': {
+    'name': 'Tri team',
+    'coach': 'Kevin',
+  },
+  'color': 'red',
+  'bikes': [
+    {'brand': 'specialized', 'model': 'shiv'},
+    {'brand': 'specialized', 'model': 'tarmac'},
+  ],
+  'results': [
+    '1st Oceanside',
+    '5th Honu',
+  ],
+  'splits': [[1,11,111], [2, 22, 222], [3, 33, 333]],
+}
+
+// Some formatting function we used above, on top of the
+// predefined ones.
+var fmt = {
+  'caps': function(el, v, data, key) {
+    el.textContent = v.toUpperCase();
+  },
+  // This will only work well if the array isn't mutable.
+  'txtsep': function(el, v, data, key) {
+    el.textContent = v;
+    if (key < data.length - 1) {
+      el.textContent += ', ';
+    }
+  },
+  'log': function(el, v, data, key) {
+    el.addEventListener('click', function(ev) {
+      console.log(data, key, v);
+    });
+  },
+  'first': function(el, v, data, key) {
+    el.style.fontWeight = v.indexOf('1st') == 0 ? 'bold' : 'normal';
+  },
+};
+
+bind(d, document.querySelector('#root'), fmt, function() {
+    document.querySelector('#json').textContent = JSON.stringify(d, null, "  ");
+});
+
+var count = 0;
+function addBike() {
+  d['bikes'].push({'brand': 'specialized', 'model': 'venge ' + count++});
+}
+function removeBike() {
+  if (d['bikes'].length == 1) {
+    d['bikes'].splice(0, 1);
+  } else if (d['bikes'].length == 5) {
+    d['bikes'].splice(4, 1);
+  } else {
+    d['bikes'].splice(1, 1);
+  }
+}
+function changeBike() {
+  if (d['bikes'].length == 1) {
+    d['bikes'][0]['model'] = 'tarmac ' + count++;
+  } else if (d['bikes'].length == 5) {
+    d['bikes'][4]['model'] = 'tarmac ' + count++;
+  } else if (d['bikes'].length > 0) {
+    d['bikes'][1]['model'] = 'tarmac ' + count++;
+  }
+}
+function changeBikes() {
+  d['bikes'] = [
+    {'brand': 'trek', 'model': 'speed concept'},
+  ];
+}
+function addDiv() {
+  d['div'] = 'Cat 2';
+}
+function removeDiv() {
+  delete d['div'];
+}
+function otherDiv() {
+  d['div'] = 'Cat 3';
+}
+function changeCoach() {
+  d['team']['coach'] = 'Rob';
+}
+function changeTeam() {
+  d['team'] = {
+    'name': 'Run Far',
+    'coach': 'Mimi',
+  };
+}
+function addResult() {
+  d['results'].push('CIM: ' + count++);
+}
+function changeResult() {
+  if (d['results'].length > 0) {
+    d['results'][Math.ceil((d['results'].length-1)/2)] += '!';
+  }
+}
+function changeResults() {
+  d['results'] = ['4:37 Oceanside', '3:12 CIM'];
+}
+function removeResult() {
+  if (d['results'].length == 1) {
+    d['results'].splice(0, 1);
+  } else if (d['results'].length == 5) {
+    d['results'].splice(4, 1);
+  } else {
+    d['results'].splice(1, 1);
+  }
+}
+</script>
+</body>
+</html>
