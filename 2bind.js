@@ -95,7 +95,6 @@ var bind = (function() {
     Array.observe(data, observer);
   }
 
-  // 3kg 400
   Bnid2.prototype._bindObject = function(data, node) {
     var el = node;
     var isTpl = node.dataset && node.dataset['bindtpl'];
