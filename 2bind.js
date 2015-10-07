@@ -62,7 +62,7 @@ var bind = (function() {
       return;
     }
     var tplSelector = el.dataset['bindtpl'];
-    var tpl = root.querySelector(tplSelector);
+    var tpl = this.root.querySelector(tplSelector);
 
     _clear(el);
     for (var sub = 0; sub < data.length; ++sub) {
@@ -101,7 +101,7 @@ var bind = (function() {
     if (isTpl) {
       _clear(node);
       var tplSelector = node.dataset['bindtpl'];
-      var tpl = root.querySelector(tplSelector);
+      var tpl = this.root.querySelector(tplSelector);
       el = document.importNode(tpl.content, true);
     }
 
