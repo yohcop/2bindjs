@@ -165,7 +165,12 @@ var bind = (function() {
 
   Bnid2.prototype._bind = function(data, key, node) {
     var o = (key !== null && key !== undefined) ? data[key] : data;
-    if (Array.isArray(o)) {
+
+    // First off, before even looking at the type, if there is
+    // a formatter specified, use that.
+    if (node.dataset && node.dataset['bindformat']) {
+      this._bindValue(data, key, node);
+    } else if (Array.isArray(o)) {
       this._bindArray(o, node);
     } else if (typeof o == 'object') {
       this._bindObject(o, node);
