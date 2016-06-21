@@ -15,7 +15,7 @@
 
 var bind = (function() {
 
-  // Formatters take as argument:
+  // Formatters are function taking as argument:
   // el: the element to modify
   // value: the value
   // data: the object containing the value
@@ -41,17 +41,42 @@ var bind = (function() {
     return ['input'].indexOf(tpe) !== -1;
   }
 
+  function IdMap() {
+    var values = {};
+    var nextId = 1;
+
+    return {
+      set: function(key, value) {
+        var id = key.___id___;
+        if (!id) {
+          id = nextId++;
+          values[id] = value;
+          key.___id___ = id;
+        }
+        values[id] = value;
+      },
+      get: function(key) {
+        return values[key.___id___];
+      },
+      has: function(key) {
+        if (key) return key.___id___ > 0;
+        return false;
+      },
+      dbg: function() {
+        console.log(values);
+      }
+    };
+  }
+
   function Bnid2(root, formatters, onChangeCb) {
     this.root = root;
     this.formatters = formatters;
-    this.onChangeCb = onChangeCb;
-  }
-
-  Bnid2.prototype._cb = function() {
-    if (this.onChangeCb) this.onChangeCb();
+    this.paths = new IdMap();
   }
 
   Bnid2.prototype._bindArray = function(data, el) {
+    this.maybeSaveMapping(data, el);
+
     var isTpl = el.dataset && el.dataset['bindtpl'];
     var tpl = null;
     if (!isTpl) {
@@ -61,45 +86,37 @@ var bind = (function() {
       }
       return;
     }
+
     var tplSelector = el.dataset['bindtpl'];
     var tpl = this.root.querySelector(tplSelector);
 
+    var shadow = null;
+    if (el.shadowRoot) shadow = el.shadowRoot;
+    else shadow = el.createShadowRoot();
+
     _clear(el);
+    _clear(shadow);
+
+    // SEE THIS:
+    // http://ejohn.org/blog/dom-documentfragments/
     for (var sub = 0; sub < data.length; ++sub) {
       var clone = document.importNode(tpl.content, true);
-      this._bind(data, sub, clone);
-      el.appendChild(clone);
+      var s = clone.firstElementChild;
+      //var s = document.createElement('span');
+      //s.appendChild(clone);
+      this._bind(data, sub, s);
+      shadow.appendChild(s);
     }
-
-    var observer = function(change) {
-      for (var i = 0; i < change.length; ++i) {
-        var c = change[i];
-        if (c.type == 'splice' && change[i].addedCount > 0) {
-          var clone = document.importNode(tpl.content, true);
-          this._bind(c.object, c.index, clone);
-          el.insertBefore(clone, el.children[index]);
-        } else if (c.type == 'splice' && c.removed.length > 0) {
-          var index = c.index;
-          el.removeChild(el.children[index]);
-        } else if (c.type == 'update') {
-          var index = c.name;
-          el.removeChild(el.children[index]);
-          var clone = document.importNode(tpl.content, true);
-          this._bind(c.object, c.name, clone);
-          el.insertBefore(clone, el.children[index]);
-        }
-      }
-      this._cb();
-    }.bind(this);
-
-    Array.observe(data, observer);
   }
 
   Bnid2.prototype._bindObject = function(data, node) {
+    this.maybeSaveMapping(data, node);
+
     var el = node;
     var isTpl = node.dataset && node.dataset['bindtpl'];
+
     if (isTpl) {
-      _clear(node);
+      _clear(el);
       var tplSelector = node.dataset['bindtpl'];
       var tpl = this.root.querySelector(tplSelector);
       el = document.importNode(tpl.content, true);
@@ -119,19 +136,12 @@ var bind = (function() {
       }
     }
 
-    if (isTpl) node.appendChild(el);
-
-    var observer = function(change) {
-      for (var i = 0; i < change.length; ++i) {
-        var c = change[i];
-        for (var e = 0; e < els[c.name].length; ++e) {
-          this._bind(c.object, c.name, els[c.name][e]);
-        }
-      }
-      this._cb();
-    }.bind(this);
-
-    Object.observe(data, observer);
+    if (isTpl) {
+      if (node.shadowRoot) shadow = node.shadowRoot;
+      else shadow = node.createShadowRoot();
+      _clear(shadow);
+      shadow.appendChild(el);
+    }
   }
 
   Bnid2.prototype._bindValue = function(data, key, node) {
@@ -151,10 +161,13 @@ var bind = (function() {
         var hasValue = _hasValue(sub);
         if (hasValue) {
           sub.value = v;
-          if (key !== null && key !== undefined) {
+          if (key !== null && key !== undefined && !sub.dataset['eventset']) {
+            var t = this;
             sub.addEventListener('change', function(ev) {
               data[key] = ev.target.value;
+              t.update(data, key);
             });
+            sub.dataset['eventset'] = true;
           }
         } else {
           sub.textContent = v;
@@ -179,6 +192,83 @@ var bind = (function() {
     }
   }
 
+  Bnid2.prototype.maybeSaveMapping = function(o, node) {
+    if (o instanceof Object) {
+      var root = node;//node.shadowRoot ? node.shadowRoot : node;
+      if (this.paths.has(o) && this.paths.get(o).indexOf(root) == -1) {
+        this.paths.get(o).push(root);
+      } else if (!this.paths.has(o)) {
+        this.paths.set(o, [root]);
+      }
+    }
+  }
+
+  Bnid2.prototype.update = function(data, key) {
+    var p2 = data[key];
+    var path = data;
+    // For arrays, we should update the parent (below)
+    // If we can update just the minimum possible, do it.
+    if (this.paths.has(p2) && this.paths.get(p2).length > 0 && !Array.isArray(data)) {
+      for (var i = 0; i < this.paths.get(p2).length; ++i) {
+        this._bind(data, key, this.paths.get(p2)[i]);
+      }
+    } else if (this.paths.has(path)) {
+      // Update the parent, as a "root".
+      for (var i = 0; i < this.paths.get(path).length; ++i) {
+        this._bind(data, null, this.paths.get(path)[i]);
+      }
+    }
+  }
+
+  function deepProxy(data, cb) {
+    if (data instanceof Object) {
+      var observer = new Observer(cb);
+      var proxy = new Proxy(data, observer);
+      var keys = Object.keys(data);
+      for (var ki = 0; ki < keys.length; ++ki) {
+        var k = keys[ki];
+        proxy[k] = deepProxy(data[k], cb);
+      }
+      observer.ready = true;
+      return proxy;
+    }
+    return data;
+  }
+
+  function Observer(cb) {
+    this.cb = cb;
+    this.ready = false;
+  }
+
+  Observer.prototype.set = function(target, property, value, receiver) {
+    var r = null;
+    if (this.ready) {
+      r = (target[property] = deepProxy(value, this.cb));
+      this.cb(target, property);
+    } else {
+      r = (target[property] = value);
+    }
+    return r;
+  };
+
+  Observer.prototype.deleteProperty = function(target, property, receiver) {
+    var r = delete target[property];
+    if (!Array.isArray(target)) {
+      // For arrays, deleting properties (or indices), causes a problem.
+      // Calling cb would trigger an update, but at this point, length
+      // is not yet updated.
+      // Basically deleting an index calls (at least in Chrome):
+      //
+      //   deleteProperty(array, index)
+      //   set(array, 'length', array.length-1)
+      //
+      // or something like that.
+      // No worries though, since array.length is set later, the set handler will do the update.
+      this.cb(target, property);
+    }
+    return r;
+  };
+
   // data: Plain old data object
   // node: root node to bind the data to
   // formatters: map from name to formatter function
@@ -189,8 +279,21 @@ var bind = (function() {
     var fmt = {};
     for (var f in defaultFormatters) fmt[f] = defaultFormatters[f];
     for (var f in formatters) fmt[f] = formatters[f];
-    var b = new Bnid2(node, fmt, cb);
-    b._bind(data, null, node);
-  }
 
+    var b = new Bnid2(node, fmt);
+
+    var ready = false;
+    var proxyChange = function(obj, key) {
+      if (ready) {
+        b.update(obj, key);
+        if (cb) cb();
+      }
+    };
+
+    var proxy = deepProxy(data, proxyChange);
+    b._bind(data, null, node);
+    ready = true;
+
+    return proxy;
+  };
 })();

@@ -122,73 +122,73 @@ var fmt = {
   },
 };
 
-bind(d, document.querySelector('#root'), fmt, function() {
+var proxy = bind(d, document.querySelector('#root'), fmt, function() {
     document.querySelector('#json').textContent = JSON.stringify(d, null, "  ");
 });
 
 var count = 0;
 function addBike() {
-  d['bikes'].push({'brand': 'specialized', 'model': 'venge ' + count++});
+  proxy['bikes'].push({'brand': 'specialized', 'model': 'venge ' + count++});
 }
 function removeBike() {
-  if (d['bikes'].length == 1) {
-    d['bikes'].splice(0, 1);
-  } else if (d['bikes'].length == 5) {
-    d['bikes'].splice(4, 1);
+  if (proxy['bikes'].length == 1) {
+    proxy['bikes'].splice(0, 1);
+  } else if (proxy['bikes'].length == 5) {
+    proxy['bikes'].splice(4, 1);
   } else {
-    d['bikes'].splice(1, 1);
+    proxy['bikes'].splice(1, 1);
   }
 }
 function changeBike() {
-  if (d['bikes'].length == 1) {
-    d['bikes'][0]['model'] = 'tarmac ' + count++;
-  } else if (d['bikes'].length == 5) {
-    d['bikes'][4]['model'] = 'tarmac ' + count++;
-  } else if (d['bikes'].length > 0) {
-    d['bikes'][1]['model'] = 'tarmac ' + count++;
+  if (proxy['bikes'].length == 1) {
+    proxy['bikes'][0]['model'] = 'tarmac ' + count++;
+  } else if (proxy['bikes'].length == 5) {
+    proxy['bikes'][4]['model'] = 'tarmac ' + count++;
+  } else if (proxy['bikes'].length > 0) {
+    proxy['bikes'][1]['model'] = 'tarmac ' + count++;
   }
 }
 function changeBikes() {
-  d['bikes'] = [
+  proxy['bikes'] = [
     {'brand': 'trek', 'model': 'speed concept'},
   ];
 }
 function addDiv() {
-  d['div'] = 'Cat 2';
+  proxy['div'] = 'Cat 2';
 }
 function removeDiv() {
-  delete d['div'];
+  delete proxy['div'];
 }
 function otherDiv() {
-  d['div'] = 'Cat 3';
+  proxy['div'] = 'Cat 3';
 }
 function changeCoach() {
-  d['team']['coach'] = 'Rob';
+  proxy['team']['coach'] = 'Rob';
 }
 function changeTeam() {
-  d['team'] = {
+  proxy['team'] = {
     'name': 'Run Far',
     'coach': 'Mimi',
   };
 }
 function addResult() {
-  d['results'].push('CIM: ' + count++);
+  proxy['results'].push('CIM: ' + count++);
 }
 function changeResult() {
-  if (d['results'].length > 0) {
-    d['results'][Math.ceil((d['results'].length-1)/2)] += '!';
+  if (proxy['results'].length > 0) {
+    proxy['results'][Math.ceil((proxy['results'].length-1)/2)] += '!';
   }
 }
 function changeResults() {
-  d['results'] = ['4:37 Oceanside', '3:12 CIM'];
+  proxy['results'] = ['4:37 Oceanside', '3:12 CIM'];
 }
 function removeResult() {
-  if (d['results'].length == 1) {
-    d['results'].splice(0, 1);
-  } else if (d['results'].length == 5) {
-    d['results'].splice(4, 1);
+  if (proxy['results'].length == 1) {
+    proxy['results'].splice(0, 1);
+  } else if (proxy['results'].length == 5) {
+    proxy['results'].splice(4, 1);
   } else {
-    d['results'].splice(1, 1);
+    proxy['results'].splice(1, 1);
   }
 }
 </script>
