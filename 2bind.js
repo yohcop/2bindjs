@@ -150,17 +150,18 @@ var bind = (function() {
     for (var i = 0; i < subs.length; ++i) {
       var sub = subs[i];
       var v = data[key];
+      var target = (v instanceof Object && '__target__' in v) ? v.__target__ : v;
       var format = sub.dataset['bindformat'];
       if (format) {
         var formatters = format.split(',');
         for (var fi = 0; fi < formatters.length; ++fi) {
           var fmt = this.formatters[formatters[fi]];
-          fmt(sub, v, data, key);
+          fmt(sub, target, data, key);
         }
       } else {
         var hasValue = _hasValue(sub);
         if (hasValue) {
-          sub.value = v;
+          sub.value = target;
           if (key !== null && key !== undefined && !sub.dataset['eventset']) {
             var t = this;
             sub.addEventListener('change', function(ev) {
@@ -170,7 +171,7 @@ var bind = (function() {
             sub.dataset['eventset'] = true;
           }
         } else {
-          sub.textContent = v;
+          sub.textContent = target;
         }
       }
     }
@@ -239,6 +240,16 @@ var bind = (function() {
     this.cb = cb;
     this.ready = false;
   }
+
+  Observer.prototype.has = function(target, property) {
+    if (property == '__target__') return true;
+    return property in target;
+  };
+
+  Observer.prototype.get = function(target, property, receiver) {
+    if (property == '__target__') return target;
+    return target[property];
+  };
 
   Observer.prototype.set = function(target, property, value, receiver) {
     var r = null;
