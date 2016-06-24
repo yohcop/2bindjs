@@ -6,6 +6,7 @@
 <div id="root">
   <p>
     Name:
+    <!-- You can nest binds, this doesn't use a different root object. -->
     <span data-bind="color" data-bindformat="color">
       <span data-bind="name"></span>
     </span>
@@ -74,6 +75,7 @@
   </template>
   <ul data-bind="splits" data-bindtpl="#array1"></ul>
 
+  <pre data-bindval data-bindformat="json"></pre>
   <pre id="json"></pre>
 </div>
 
@@ -97,6 +99,7 @@ var d = {
     '5th Honu',
   ],
   'splits': [[1,11,111], [2, 22, 222], [3, 33, 333]],
+  'date': new Date(),
 }
 
 // Some formatting function we used above, on top of the
@@ -119,6 +122,9 @@ var fmt = {
   },
   'first': function(el, v, data, key) {
     el.style.fontWeight = v.indexOf('1st') == 0 ? 'bold' : 'normal';
+  },
+  'json': function(el, val, data, key) {
+    el.textContent = JSON.stringify(val, null, "  ");
   },
 };
 

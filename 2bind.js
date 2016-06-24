@@ -15,6 +15,12 @@
 
 var bind = (function() {
 
+  var targetKey = '__2bindjs_target__';
+  var arrayKey = '__2bindjs_array__';
+  var idKey = '__2bindjs_id__';
+  var nodeKey = '__2bindjs_nodes__';
+  var specialKeys = new Set([targetKey, arrayKey, idKey, nodeKey]);
+
   // Formatters are function taking as argument:
   // el: the element to modify
   // value: the value
@@ -41,37 +47,9 @@ var bind = (function() {
     return ['input'].indexOf(tpe) !== -1;
   }
 
-  function IdMap() {
-    var values = {};
-    var nextId = 1;
-
-    return {
-      set: function(key, value) {
-        var id = key.___id___;
-        if (!id) {
-          id = nextId++;
-          values[id] = value;
-          key.___id___ = id;
-        }
-        values[id] = value;
-      },
-      get: function(key) {
-        return values[key.___id___];
-      },
-      has: function(key) {
-        if (key) return key.___id___ > 0;
-        return false;
-      },
-      dbg: function() {
-        console.log(values);
-      }
-    };
-  }
-
   function Bnid2(root, formatters, onChangeCb) {
     this.root = root;
     this.formatters = formatters;
-    this.paths = new IdMap();
   }
 
   Bnid2.prototype._bindArray = function(data, el) {
@@ -101,9 +79,10 @@ var bind = (function() {
     // http://ejohn.org/blog/dom-documentfragments/
     for (var sub = 0; sub < data.length; ++sub) {
       var clone = document.importNode(tpl.content, true);
+      // TODO: This is why list templates can only have one element.  To fix
+      // this, just do the next 3 lines in a loop on each top-level element
+      // inside the clone.
       var s = clone.firstElementChild;
-      //var s = document.createElement('span');
-      //s.appendChild(clone);
       this._bind(data, sub, s);
       shadow.appendChild(s);
     }
@@ -122,18 +101,11 @@ var bind = (function() {
       el = document.importNode(tpl.content, true);
     }
 
-    var els = {};
     var binds = el.querySelectorAll('[data-bind]');
     for (var i = 0; i < binds.length; ++i) {
       var b = binds[i];
       var property = b.dataset['bind'];
-      var value = data[property];
       this._bind(data, property, b);
-      if (els[property]) {
-        els[property].push(b);
-      } else {
-        els[property] = [b];
-      }
     }
 
     if (isTpl) {
@@ -150,7 +122,7 @@ var bind = (function() {
     for (var i = 0; i < subs.length; ++i) {
       var sub = subs[i];
       var v = data[key];
-      var target = (v instanceof Object && '__target__' in v) ? v.__target__ : v;
+      var target = (v instanceof Object && targetKey in v) ? v[targetKey] : v;
       var format = sub.dataset['bindformat'];
       if (format) {
         var formatters = format.split(',');
@@ -184,9 +156,9 @@ var bind = (function() {
     // a formatter specified, use that.
     if (node.dataset && node.dataset['bindformat']) {
       this._bindValue(data, key, node);
-    } else if (Array.isArray(o)) {
+    } else if (o && Array.isArray(o[targetKey])) {
       this._bindArray(o, node);
-    } else if (typeof o == 'object') {
+    } else if (o && typeof o[targetKey] == 'object') {
       this._bindObject(o, node);
     } else {
       this._bindValue(data, key, node);
@@ -195,88 +167,145 @@ var bind = (function() {
 
   Bnid2.prototype.maybeSaveMapping = function(o, node) {
     if (o instanceof Object) {
-      var root = node;//node.shadowRoot ? node.shadowRoot : node;
-      if (this.paths.has(o) && this.paths.get(o).indexOf(root) == -1) {
-        this.paths.get(o).push(root);
-      } else if (!this.paths.has(o)) {
-        this.paths.set(o, [root]);
+      if (node[nodeKey]) {
+        o[nodeKey].add(node);
+      } else if (!node[nodeKey]) {
+        o[nodeKey] = new Set();
+        o[nodeKey].add(node);
       }
     }
   }
 
   Bnid2.prototype.update = function(data, key) {
     var p2 = data[key];
-    var path = data;
-    // For arrays, we should update the parent (below)
-    // If we can update just the minimum possible, do it.
-    if (this.paths.has(p2) && this.paths.get(p2).length > 0 && !Array.isArray(data)) {
-      for (var i = 0; i < this.paths.get(p2).length; ++i) {
-        this._bind(data, key, this.paths.get(p2)[i]);
+
+    if (p2 && p2[nodeKey] && !data[arrayKey]) {
+      for (let node of p2[nodeKey]) {
+        this._bind(data, key, node);
       }
-    } else if (this.paths.has(path)) {
-      // Update the parent, as a "root".
-      for (var i = 0; i < this.paths.get(path).length; ++i) {
-        this._bind(data, null, this.paths.get(path)[i]);
+    } else if (data[nodeKey]) {
+      for (let node of data[nodeKey]) {
+        this._bind(data, null, node);
       }
     }
   }
 
   function deepProxy(data, cb) {
-    if (data instanceof Object) {
-      var observer = new Observer(cb);
-      var proxy = new Proxy(data, observer);
+    if (Array.isArray(data)) {
+      var wrapper = {};
+      wrapper[targetKey] = data;
+      wrapper[arrayKey] = true;
+      wrapper.length = data.length;
+
+      for (var i = 0; i < data.length; ++i) {
+        wrapper[i] = deepProxy(data[i], cb);
+      }
+
+      var observer = new ArrayObserver(cb);
+      var proxy = new Proxy(wrapper, observer);
+      return proxy;
+    } else if (data instanceof Object) {
+      var wrapper = {};
+      wrapper[targetKey] = data;
+
       var keys = Object.keys(data);
       for (var ki = 0; ki < keys.length; ++ki) {
         var k = keys[ki];
-        proxy[k] = deepProxy(data[k], cb);
+        wrapper[k] = deepProxy(data[k], cb);
       }
-      observer.ready = true;
+
+      var observer = new ObjectObserver(cb);
+      var proxy = new Proxy(wrapper, observer);
       return proxy;
     }
     return data;
   }
 
-  function Observer(cb) {
+  function ObjectObserver(cb) {
     this.cb = cb;
-    this.ready = false;
   }
 
-  Observer.prototype.has = function(target, property) {
-    if (property == '__target__') return true;
-    return property in target;
+  ObjectObserver.prototype.get = function(target, property, receiver) {
+    if (target[property]) return target[property];
+    return target[targetKey][property];
   };
 
-  Observer.prototype.get = function(target, property, receiver) {
-    if (property == '__target__') return target;
-    return target[property];
-  };
-
-  Observer.prototype.set = function(target, property, value, receiver) {
-    var r = null;
-    if (this.ready) {
-      r = (target[property] = deepProxy(value, this.cb));
-      this.cb(target, property);
-    } else {
-      r = (target[property] = value);
+  ObjectObserver.prototype.set = function(target, property, value, receiver) {
+    if (specialKeys.has(property)) {
+      return target[property] = value;
     }
+
+    var r = (target[property] = deepProxy(value, this.cb));
+    Reflect.set(target[targetKey], property, value);
+    this.cb(target, property);
     return r;
   };
 
-  Observer.prototype.deleteProperty = function(target, property, receiver) {
+  ObjectObserver.prototype.deleteProperty = function(target, property, receiver) {
     var r = delete target[property];
-    if (!Array.isArray(target)) {
-      // For arrays, deleting properties (or indices), causes a problem.
-      // Calling cb would trigger an update, but at this point, length
-      // is not yet updated.
-      // Basically deleting an index calls (at least in Chrome):
-      //
-      //   deleteProperty(array, index)
-      //   set(array, 'length', array.length-1)
-      //
-      // or something like that.
-      // No worries though, since array.length is set later, the set handler will do the update.
-      this.cb(target, property);
+    delete target[targetKey][property];
+    this.cb(target, property);
+    return r;
+  };
+
+  function ArrayObserver(cb) {
+    this.cb = cb;
+  }
+
+  ArrayObserver.prototype.get = function(target, property, receiver) {
+    if (specialKeys.has(property)) {
+      return target[property];
     }
+    if (property === 'length') {
+      return target.length;
+    }
+    if (property in target) {
+      return target[property];
+    }
+    return Array.prototype[property];
+  };
+
+  ArrayObserver.prototype.set = function(target, property, value, receiver) {
+    if (specialKeys.has(property)) {
+      return target[property] = value;
+    }
+    if (property === 'length') {
+      var r = target.length = value;
+      target[targetKey].length = value;
+      this.cb(target, null);
+      return r;
+    }
+
+    var r = (target[property] = deepProxy(value, this.cb));
+    Reflect.set(target[targetKey], property, value);
+
+    if (Number(property) >= target.length) {
+      var n = Number(property) + 1
+      target.length = n;
+      target[targetKey].length = n;
+    }
+
+    this.cb(target, property);
+    return r;
+  };
+
+  ArrayObserver.prototype.deleteProperty = function(target, property, receiver) {
+    // For arrays, deleting properties (or indices), causes a problem.
+    // Calling cb would trigger an update, but at this point, length
+    // is not yet updated.
+    // Basically deleting an index calls (at least in Chrome):
+    //
+    //   deleteProperty(array, index)
+    //   set(array, 'length', array.length-1)
+    //
+    // or something like that.
+    // No worries though, since array.length is set later, the set handler will do the update.
+
+    if (specialKeys.has(property)) {
+      return delete target[property];
+    }
+    var r = Reflect.deleteProperty(target, property, receiver);
+    Reflect.deleteProperty(target[targetKey], property, receiver);
     return r;
   };
 
@@ -293,17 +322,13 @@ var bind = (function() {
 
     var b = new Bnid2(node, fmt);
 
-    var ready = false;
     var proxyChange = function(obj, key) {
-      if (ready) {
-        b.update(obj, key);
-        if (cb) cb();
-      }
+      b.update(obj, key);
+      if (cb) cb();
     };
 
     var proxy = deepProxy(data, proxyChange);
-    b._bind(data, null, node);
-    ready = true;
+    b._bind(proxy, null, node);
 
     return proxy;
   };
