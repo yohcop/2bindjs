@@ -17,9 +17,8 @@ var bind = (function() {
 
   var targetKey = '__2bindjs_target__';
   var arrayKey = '__2bindjs_array__';
-  var idKey = '__2bindjs_id__';
   var nodeKey = '__2bindjs_nodes__';
-  var specialKeys = new Set([targetKey, arrayKey, idKey, nodeKey]);
+  var specialKeys = new Set([targetKey, arrayKey, nodeKey]);
 
   // Formatters are function taking as argument:
   // el: the element to modify
