@@ -43,6 +43,7 @@ var bind = (function() {
 
   function _hasValue(node) {
     var tpe = node.tagName.toLowerCase();
+    // For now, only support 'input' as element with 'value'.
     return ['input'].indexOf(tpe) !== -1;
   }
 
@@ -107,6 +108,11 @@ var bind = (function() {
       this._bind(data, property, b);
     }
 
+    var bindvals = el.querySelectorAll('[data-bindval]');
+    for (var i = 0; i < bindvals.length; ++i) {
+      this._bind(data, null, bindvals[i]);
+    }
+
     if (isTpl) {
       if (node.shadowRoot) shadow = node.shadowRoot;
       else shadow = node.createShadowRoot();
@@ -120,7 +126,7 @@ var bind = (function() {
     if (subs.length == 0) subs = [node];
     for (var i = 0; i < subs.length; ++i) {
       var sub = subs[i];
-      var v = data[key];
+      var v = key ? data[key] : data;
       var target = (v instanceof Object && targetKey in v) ? v[targetKey] : v;
       var format = sub.dataset['bindformat'];
       if (format) {
