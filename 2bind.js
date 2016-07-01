@@ -44,7 +44,7 @@ var bind = (function() {
   function _hasValue(node) {
     var tpe = node.tagName.toLowerCase();
     // For now, only support 'input' as element with 'value'.
-    return ['input'].indexOf(tpe) !== -1;
+    return ['input', 'textarea'].indexOf(tpe) !== -1;
   }
 
   function Bnid2(root, formatters, onChangeCb) {
@@ -79,12 +79,17 @@ var bind = (function() {
     // http://ejohn.org/blog/dom-documentfragments/
     for (var sub = 0; sub < data.length; ++sub) {
       var clone = document.importNode(tpl.content, true);
-      // TODO: This is why list templates can only have one element.  To fix
-      // this, just do the next 3 lines in a loop on each top-level element
-      // inside the clone.
-      var s = clone.firstElementChild;
-      this._bind(data, sub, s);
-      shadow.appendChild(s);
+      // NOTE: an element can no longer have multiple shadow roots inside it.
+      // This means that all the elements in a list will share the same shadow
+      // root, so a <style> element in a template will be added multiple times.
+      // It doesn't really break anything, but it's not pretty.
+      while (clone.childNodes.length > 0) {
+        var s = clone.childNodes[0];
+        if (s.nodeType !== 3 && ('bindval' in s.dataset || 'bind' in s.dataset || 'bindfn' in s.dataset)) {  // TEXT node type.
+          this._bind(data, sub, s);
+        }
+        shadow.appendChild(s);
+      }
     }
   }
 
@@ -108,64 +113,75 @@ var bind = (function() {
       this._bind(data, property, b);
     }
 
-    var bindvals = el.querySelectorAll('[data-bindval]');
-    for (var i = 0; i < bindvals.length; ++i) {
-      this._bind(data, null, bindvals[i]);
-    }
-
     if (isTpl) {
       if (node.shadowRoot) shadow = node.shadowRoot;
       else shadow = node.createShadowRoot();
+
       _clear(shadow);
       shadow.appendChild(el);
     }
   }
 
   Bnid2.prototype._bindValue = function(data, key, node) {
-    var subs = node.querySelectorAll('[data-bindval]');
-    if (subs.length == 0) subs = [node];
-    for (var i = 0; i < subs.length; ++i) {
-      var sub = subs[i];
-      var v = key ? data[key] : data;
-      var target = (v instanceof Object && targetKey in v) ? v[targetKey] : v;
-      var format = sub.dataset['bindformat'];
-      if (format) {
-        var formatters = format.split(',');
-        for (var fi = 0; fi < formatters.length; ++fi) {
-          var fmt = this.formatters[formatters[fi]];
-          fmt(sub, target, data, key);
+    var v = (key != null) ? data[key] : data;
+    var target = (v instanceof Object && targetKey in v) ? v[targetKey] : v;
+
+    var sub = node;
+    var format = sub.dataset['bindformat'];
+    if (format) {
+      var formatters = format.split(',');
+      for (var fi = 0; fi < formatters.length; ++fi) {
+        var fmt = this.formatters[formatters[fi]];
+        fmt(sub, target, data, key);
+      }
+    } else {
+      var hasValue = _hasValue(sub);
+      if (hasValue) {
+        sub.value = target;
+        if (key != null && !sub.dataset['eventset']) {
+          var t = this;
+          sub.addEventListener('change', function(ev) {
+            data[key] = ev.target.value;
+            t.update(data, key);
+          });
+          sub.dataset['eventset'] = true;
         }
       } else {
-        var hasValue = _hasValue(sub);
-        if (hasValue) {
-          sub.value = target;
-          if (key !== null && key !== undefined && !sub.dataset['eventset']) {
-            var t = this;
-            sub.addEventListener('change', function(ev) {
-              data[key] = ev.target.value;
-              t.update(data, key);
-            });
-            sub.dataset['eventset'] = true;
-          }
-        } else {
-          sub.textContent = target;
-        }
+        sub.textContent = target;
       }
     }
   }
 
+  Bnid2.prototype._bindFn = function(data, key, node) {
+    this.maybeSaveMapping(data, node);
+    var v = (key != null) ? data[key] : data;
+    var target = (v instanceof Object && targetKey in v) ? v[targetKey] : v;
+    this.formatters[node.dataset['bindfn']](node, target, data, key);
+  }
+
   Bnid2.prototype._bind = function(data, key, node) {
-    var o = (key !== null && key !== undefined) ? data[key] : data;
+    var o = (key != null) ? data[key] : data;
+
+    var subs = node.querySelectorAll('[data-bindval]');
+    if (subs.length > 0) {
+      for (var i = 0; i < subs.length; ++i) {
+        this._bind(data, key, subs[i]);
+      }
+    }
+
+    if ('bindfn' in node.dataset) {
+      this._bindFn(data, key, node);
+    }
 
     // First off, before even looking at the type, if there is
     // a formatter specified, use that.
-    if (node.dataset && node.dataset['bindformat']) {
+    if ('bindformat' in node.dataset) {
       this._bindValue(data, key, node);
-    } else if (o && Array.isArray(o[targetKey])) {
+    } else if (typeof o == 'object' && Array.isArray(o[targetKey])) {
       this._bindArray(o, node);
-    } else if (o && typeof o[targetKey] == 'object') {
+    } else if (typeof o == 'object' && typeof o[targetKey] == 'object') {
       this._bindObject(o, node);
-    } else {
+    } else if (node.childNodes.length === 0) {
       this._bindValue(data, key, node);
     }
   }

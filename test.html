@@ -1,5 +1,6 @@
 <html>
 <head>
+
 </head>
 <body>
 
@@ -43,7 +44,7 @@
     <button onclick="changeBikes()">Change bikes</button>
   </div>
   <template id="bike">
-    <li>
+    <li data-bindval>
       <span data-bind="brand" data-bindformat="caps"></span>
       <i data-bind="model" data-bindformat="txt,log"></i>
       <input data-bind="model">
@@ -59,7 +60,7 @@
     <button onclick="removeResult()">Remove result</button>
   </div>
   <template id="result">
-    <li>
+    <li data-bindval>
       <span data-bindval data-bindformat="txt,first"></span>
       <input data-bindval>
     </li>
@@ -68,14 +69,25 @@
 
   <p>Splits: (array of arrays)</p>
   <template id="array2">
-    <span data-bindval data-bindformat="txtsep"></span>
+    <style>
+      .class-1{color:red;}
+      .class-22{color:blue;}
+      .class-333{background-color:#eee}
+    </style>
+    <span data-bindfn="setclass">and</span>
+    <span data-bindfn="setclass">
+      <span data-bindval data-bindformat="txtsep"></span>
+    </span>
   </template>
   <template id="array1">
     <li data-bindval data-bindtpl="#array2"></li>
   </template>
   <ul data-bind="splits" data-bindtpl="#array1"></ul>
 
-  <pre data-bindval data-bindformat="json"></pre>
+  <p>Textarea</p>
+  <textarea data-bind="notes"></textarea>
+  <pre data-bind="notes"></pre>
+
   <pre id="json"></pre>
 </div>
 
@@ -100,6 +112,7 @@ var d = {
   ],
   'splits': [[1,11,111], [2, 22, 222], [3, 33, 333]],
   'date': new Date(),
+  'notes': 'some long notes',
 }
 
 // Some formatting function we used above, on top of the
@@ -123,8 +136,8 @@ var fmt = {
   'first': function(el, v, data, key) {
     el.style.fontWeight = v.indexOf('1st') == 0 ? 'bold' : 'normal';
   },
-  'json': function(el, val, data, key) {
-    el.textContent = JSON.stringify(val, null, "  ");
+  'setclass': function(el, val, data, key) {
+    el.classList.add('class-'+val);
   },
 };
 
