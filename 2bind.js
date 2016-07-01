@@ -137,7 +137,7 @@ var bind = (function() {
     } else {
       var hasValue = _hasValue(sub);
       if (hasValue) {
-        sub.value = target;
+        sub.value = target || '';
         if (key != null && !sub.dataset['eventset']) {
           var t = this;
           sub.addEventListener('change', function(ev) {
