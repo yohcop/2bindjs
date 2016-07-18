@@ -4,95 +4,195 @@
 </head>
 <body>
 
+<h1>etch.js library demo</h1>
+
 <div id="root">
-  <p>
-    Name:
-    <!-- You can nest binds, this doesn't use a different root object. -->
-    <span data-bind="color" data-bindformat="color">
-      <span data-bind="name"></span>
+  <h2>Using etch-val</h2>
+  <h3>Default</h3>
+  <ul>
+    <li>String (Name): <span data-etch-val="name"></span></li>
+    <li>Array (Results): <span data-etch-val="results"></span></li>
+    <li>Object (Team): <span data-etch-val="team"></span></li>
+    <li>Optional String (Division): <span data-etch-val="div"></span></li>
+    <li>Array of objects (Bikes): <span data-etch-val="bikes"></span></li>
+    <li>Array of arrays (Splits): <span data-etch-val="splits"></span></li>
+  </ul>
+
+  <h3>With etch-fn</h3>
+  <ul>
+    <li>String (Name): <span data-etch-val="name" data-etch-fn="caps"></span></li>
+    <li>Array (Results): <span data-etch-val="results" data-etch-fn="concat"></span></li>
+    <li>Object (Team): <span data-etch-val="team" data-etch-fn="json"></span></li>
+    <li>Optional String (Division): <span data-etch-val="div" data-etch-fn="reverse"></span></li>
+    <li>Array of objects (Bikes): <span data-etch-val="bikes" data-etch-fn="bikemodel"></span></li>
+    <li>Array of arrays (Splits): <span data-etch-val="splits" data-etch-fn="splitsToTxt"></span></li>
+  </ul>
+
+  <div>
+    Nested elements:
+    <span data-etch-val="color" data-etch-fn="color">
+      <span data-etch-val="name"></span>
     </span>
-    (should be <span data-bind="color" data-bindformat="color,txt"></span>)
-  </p>
-  <p>Edit name: <input data-bind="name"></input></p>
-  <p>Color: <input data-bind="color"></input></p>
-
-  <p>Division: <span data-bind="div"></span></p>
-  <div>
-    <button onclick="addDiv()">Add division</button>
-    <button onclick="removeDiv()">Remove division</button>
-    <button onclick="otherDiv()">Other division</button>
   </div>
 
+  <div>
+    Use multiple data-etch-fn <span data-etch-val="color" data-etch-fn="color,content"></span>
+  </div>
 
-  <template id="team">
-    <span data-bind="name"></span>, coached by
-    <span data-bind="coach"></span>
-    (change team to: <input data-bind="name">)
+  <h2>Using etch-each</h2>
+
+  <h3>Without shadow root</h3>
+  <style>
+  .results-each li{background-color:#ccc}
+  </style>
+  <ul class="results-each" data-etch-each="results" data-etch-tpl="#result1"></ul>
+  <template id="result1">
+    <li data-etch-val data-etch-fn="content,first"></li>
   </template>
-  <p>Team: (object) <span data-bind="team" data-bindtpl="#team"></span></p>
-  <div>
-    <button onclick="changeCoach()">Change coach</button>
-    <button onclick="changeTeam()">Change team</button>
-  </div>
 
-
-  <p>Bikes: (array of objects)</p>
-  <div>
-    <button onclick="addBike()">Add bike</button>
-    <button onclick="removeBike()">Remove bike</button>
-    <button onclick="changeBike()">Change bike</button>
-    <button onclick="changeBikes()">Change bikes</button>
-  </div>
+  <ul data-etch-each="bikes" data-etch-tpl="#bike"></ul>
   <template id="bike">
-    <li data-bindval>
-      <span data-bind="brand" data-bindformat="caps"></span>
-      <i data-bind="model" data-bindformat="txt,log"></i>
-      <input data-bind="model">
+    <li>
+      <span data-etch-val="brand" data-etch-fn="caps"></span>
+      <i data-etch-val="model" data-etch-fn="content,log"></i>
+      (<span data-etch-val data-etch-fn="json"></span>)
     </li>
   </template>
-  <ul data-bind="bikes" data-bindtpl="#bike"></ul>
 
-  <p>Results: (array of strings)</p>
+  <style>
+    .class-1{color:red;}
+    .class-22{color:blue;}
+    .class-333{background-color:#eee}
+  </style>
+  <ul data-etch-each="splits" data-etch-tpl="#splits1"></ul>
+  <template id="splits1">
+    <li data-etch-each data-etch-tpl="#splits2"></li>
+  </template>
+  <template id="splits2">
+    <span data-etch-val data-etch-fn="setclass">and</span>
+    <span data-etch-val data-etch-fn="setclass">
+      <span data-etch-val></span>
+    </span>
+  </template>
+
+  <table>
+    <tbody data-etch-each="splits" data-etch-tpl="#tablerow"></tbody>
+  </table>
+  <template id="tablerow">
+    <tr id="row">
+      <td>Split name</td>
+      <td data-etch-each data-etch-insert="beforebegin" data-etch-tpl="#tablecol"></td>
+    </tr>
+  </template>
+  <template data-etch-each id="tablecol">
+    <span data-etch-val></span>
+  </template>
+
+  <h3>With shadow root</h3>
+  <ul class="results-each" data-etch-each="results" data-etch-tpl="#result1" data-etch-shadow></ul>
+  <template id="result1">
+    <li data-etch-val></li>
+  </template>
+
+  <h2>Using etch-obj</h2>
+
+  <h3>Without template</h3>
+  <p data-etch-obj="team">
+    The team name is <span data-etch-val="name"></span> and the coach is <span data-etch-val="coach"></span>.
+  </p>
+
+  <h3>With template</h3>
+
+  <h4>Without shadow root</h4>
+  <p>External styles are applied to children</p>
+  <style>
+  .team span{background-color:#cce}
+  </style>
+  <p class="team" data-etch-obj="team" data-etch-tpl="#team"></p>
+  <template id="team">
+    The team name is
+    <span data-etch-val="name"></span>
+    and the coach is
+    <span data-etch-val="coach"></span>.
+  </template>
+
+  <h4>With shadow root</h4>
+  <p>External styles are not applied to children</p>
+  <p class="team" data-etch-obj="team" data-etch-tpl="#team" data-etch-shadow></p>
+  <template id="team">
+    The team name is
+    <span data-etch-val="name"></span>
+    and the coach is
+    <span data-etch-val="coach"></span>.
+  </template>
+
+
+  <h2>Creating a manual 2-way binding</h2>
+
+  <h3>Top-level values</h3>
+  <p>
+    Change the person's name: <input data-etch-val="name" data-etch-fn="valueBind">
+  </p>
+
+  <h3>Nested values</h3>
+  <p>
+    Change the team name:
+    <span data-etch-obj="team"><input data-etch-val="coach" data-etch-fn="valueBind"></span>
+  </p>
+  <p>
+    You will notice that changing the value in the box does not change the json
+    rendering of the team here:
+    <pre data-etch-val="team" data-etch-fn="json"></pre>
+    This is because we rendered the team object, but we changed team.coach. This does
+    not trigger the re-rendering of the team object.
+  </p>
+  <p>
+    On the other hand, this should get updated:
+    <pre data-etch-obj="team"><span data-etch-val="coach"></span></pre>
+    because we render, and therefore listen specifically for changes to team.coach.
+  </p>
+
+
+
+  <h2>Changing the data model</h2>
+  <div>
+    <button onclick="changeName()">Change name</button>
+  </div>
+  <div>
+    <button onclick="changeColor()">Change color</button>
+  </div>
+  <div>
+    <button onclick="addDiv()">Add division</button>
+    <button onclick="otherDiv()">Other division</button>
+    <button onclick="removeDiv()">Remove division</button>
+  </div>
   <div>
     <button onclick="addResult()">Add result</button>
     <button onclick="changeResult()">Change result</button>
     <button onclick="changeResults()">Change results</button>
     <button onclick="removeResult()">Remove result</button>
   </div>
-  <template id="result">
-    <li data-bindval>
-      <span data-bindval data-bindformat="txt,first"></span>
-      <input data-bindval>
-    </li>
-  </template>
-  <ul data-bind="results" data-bindtpl="#result"></ul>
-
-  <p>Splits: (array of arrays)</p>
-  <template id="array2">
-    <style>
-      .class-1{color:red;}
-      .class-22{color:blue;}
-      .class-333{background-color:#eee}
-    </style>
-    <span data-bindfn="setclass">and</span>
-    <span data-bindfn="setclass">
-      <span data-bindval data-bindformat="txtsep"></span>
-    </span>
-  </template>
-  <template id="array1">
-    <li data-bindval data-bindtpl="#array2"></li>
-  </template>
-  <ul data-bind="splits" data-bindtpl="#array1"></ul>
-
-  <p>Textarea</p>
-  <textarea data-bind="notes"></textarea>
-  <pre data-bind="notes"></pre>
+  <div>
+    <button onclick="changeCoach()">Change coach</button>
+    <button onclick="changeTeam()">Change team</button>
+  </div>
+  <div>
+    <button onclick="addBike()">Add bike</button>
+    <button onclick="removeBike()">Remove bike</button>
+    <button onclick="changeBike()">Change bike</button>
+    <button onclick="changeBikes()">Change bikes</button>
+  </div>
+  <div>
+    <button onclick="changeSplit()">Change split[1][1]</button>
+  </div>
+  <!-- ----------------------------------------------------------------- -->
+  <!-- OLD -->
 
   <pre id="json"></pre>
 </div>
 
 
-<script src="2bind.js"></script>
+<script src="etch.js"></script>
 <script>
 
 var d = {
@@ -121,33 +221,66 @@ var fmt = {
   'caps': function(el, v, data, key) {
     el.textContent = v.toUpperCase();
   },
-  // This will only work well if the array isn't mutable.
-  'txtsep': function(el, v, data, key) {
-    el.textContent = v;
-    if (key < data.length - 1) {
-      el.textContent += ', ';
-    }
+  'concat': function(el, v, data, key) {
+    el.textContent = v.join('');
   },
+  'json': function(el, v, data, key) {
+    el.textContent = JSON.stringify(v);
+  },
+  'reverse': function(el, v, data, key) {
+    if (v) el.textContent = v.split('').reverse().join('');
+    else el.textContent = '';
+  },
+
   'log': function(el, v, data, key) {
     el.addEventListener('click', function(ev) {
-      console.log(data, key, v);
+      console.log(v);
     });
   },
   'first': function(el, v, data, key) {
     el.style.fontWeight = v.indexOf('1st') == 0 ? 'bold' : 'normal';
   },
   'setclass': function(el, val, data, key) {
+    if ("" + val == "1,11,111") {
+      console.log("wtf");
+    }
     el.classList.add('class-'+val);
+  },
+  'bikemodel': function(el, val, data, key) {
+    el.textContent = val.map(x => x['model']).join(", ");
+  },
+  'splitsToTxt': function(el, val, data, key) {
+    el.textContent = val.map(x => x.join(" > ")).join(" | ");
+  },
+
+  'nameChange': function(el, val, data, key) {
+    // This is used to setup a 2-way binding.
+    // Make sure we don't add the event listener at every change.
+    if (!el.dataset['eventSet']) {
+      el.dataset['eventSet'] = 1;
+      el.addEventListener('change', function(ev) {
+        console.log("Changing name to " + el.value);
+        proxy['name'] = el.value;
+      });
+    }
   },
 };
 
-var proxy = bind(d, document.querySelector('#root'), fmt, function() {
+var proxy = etch(d, document.querySelector('#root'), fmt, function() {
     document.querySelector('#json').textContent = JSON.stringify(d, null, "  ");
 });
 
-var count = 0;
+var count = 0;  // Used to make unique names and bikes, etc.
+function changeName() {
+  proxy['name'] = 'Richard King ' + count++;
+}
+function changeColor() {
+  proxy['color'] = proxy['color'] === 'blue' ? 'red' : 'blue';
+}
 function addBike() {
   proxy['bikes'].push({'brand': 'specialized', 'model': 'venge ' + count++});
+  // Somewhere, we render 'bikes' as a value. For it to update, we must touch it.
+  proxy.touch('bikes');
 }
 function removeBike() {
   if (proxy['bikes'].length == 1) {
@@ -157,6 +290,7 @@ function removeBike() {
   } else {
     proxy['bikes'].splice(1, 1);
   }
+  proxy.touch('bikes');
 }
 function changeBike() {
   if (proxy['bikes'].length == 1) {
@@ -166,6 +300,7 @@ function changeBike() {
   } else if (proxy['bikes'].length > 0) {
     proxy['bikes'][1]['model'] = 'tarmac ' + count++;
   }
+  proxy.touch('bikes');
 }
 function changeBikes() {
   proxy['bikes'] = [
@@ -183,6 +318,8 @@ function otherDiv() {
 }
 function changeCoach() {
   proxy['team']['coach'] = 'Rob';
+  // Somewhere, we render 'team' as a value. For it to update, we must touch it.
+  proxy.touch('team');
 }
 function changeTeam() {
   proxy['team'] = {
@@ -192,14 +329,18 @@ function changeTeam() {
 }
 function addResult() {
   proxy['results'].push('CIM: ' + count++);
+  // Somewhere, we render 'results' as a value. For it to update, we must touch it.
+  proxy.touch('results');
 }
 function changeResult() {
   if (proxy['results'].length > 0) {
     proxy['results'][Math.ceil((proxy['results'].length-1)/2)] += '!';
   }
+  proxy.touch('results');
 }
 function changeResults() {
   proxy['results'] = ['4:37 Oceanside', '3:12 CIM'];
+  proxy.touch('results');
 }
 function removeResult() {
   if (proxy['results'].length == 1) {
@@ -209,6 +350,11 @@ function removeResult() {
   } else {
     proxy['results'].splice(1, 1);
   }
+  proxy.touch('results');
+}
+function changeSplit() {
+  proxy['splits'][1][1] = 99;
+  proxy.touch('splits');
 }
 </script>
 </body>

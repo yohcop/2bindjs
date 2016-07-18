@@ -13,26 +13,36 @@
 // a formatter (basically index=key)
 // TODO: chance to change 'bind' to something else in data attributes names.
 
-var bind = (function() {
+var etch = (function() {
 
-  var targetKey = '__2bindjs_target__';
-  var arrayKey = '__2bindjs_array__';
-  var nodeKey = '__2bindjs_nodes__';
-  var specialKeys = new Set([targetKey, arrayKey, nodeKey]);
+  var targetKey = '__etchjs_target__';
+  var arrayKey = '__etchjs_array__';
+  var nodeKey = '__etchjs_nodes__';
+  var valNodeKey = '__etchjs_val_nodes__';
+  var specialKeys = new Set([targetKey, arrayKey, nodeKey, valNodeKey]);
 
   // Formatters are function taking as argument:
   // el: the element to modify
   // value: the value
-  // data: the object containing the value
-  // key: basically, data[key] = value. data and key are sometimes
-  //   useful to formatters.
   var defaultFormatters = {
-    'txt': function(el, value, data, key) {
+    'content': function(el, value, data, key) {
       el.textContent = value;
     },
     'color': function(el, value, data, key) {
       el.style.color = value;
-    }
+    },
+    'value': function(el, value, data, key) {
+      el.value = value;
+    },
+    'valueBind': function(el, value, data, key) {
+      el.value = value;
+      if (!el.dataset['etchEventSet']) {
+        el.dataset['etchEventSet'] = 1;
+        el.addEventListener('change', function(ev) {
+          data[key] = el.value;
+        });
+      }
+    },
   }
 
   function _clear(el) {
@@ -41,173 +51,198 @@ var bind = (function() {
     }
   }
 
-  function _hasValue(node) {
-    var tpe = node.tagName.toLowerCase();
-    // For now, only support 'input' as element with 'value'.
-    return ['input', 'textarea'].indexOf(tpe) !== -1;
+  function _findDocFragment(e) {
+    while(e.nodeType != 11) { // 11 = DOCUMENT_FRAGMENT_NODE
+      e = e.parentNode;
+    }
+    return e
   }
 
-  function Bnid2(root, formatters, onChangeCb) {
+  function Etch(root, formatters, onChangeCb) {
     this.root = root;
     this.formatters = formatters;
   }
 
-  Bnid2.prototype._bindArray = function(data, el) {
-    this.maybeSaveMapping(data, el);
+  Etch.prototype._bindArray = function(data, key, el, updating) {
+    if (!updating) this.maybeSaveMapping(data, data, key, el);
+    var value = (key != null) ? data[key] : data;
+    if (!updating) this.maybeSaveMapping(value, data, key, el);
 
-    var isTpl = el.dataset && el.dataset['bindtpl'];
-    var tpl = null;
-    if (!isTpl) {
-      var roots = el.querySelectorAll('[data-bindtpl]');
-      for (var i = 0; i < roots.length; ++i) {
-        this._bindArray(data, roots[i]);
-      }
-      return;
+    var tpl = this.root.querySelector(el.dataset['etchTpl']);
+
+    var root = el;
+    if (el.dataset['etchShadow'] === "") {
+      if (el.shadowRoot) root = el.shadowRoot;
+      else root = el.createShadowRoot();
     }
 
-    var tplSelector = el.dataset['bindtpl'];
-    var tpl = this.root.querySelector(tplSelector);
-
-    var shadow = null;
-    if (el.shadowRoot) shadow = el.shadowRoot;
-    else shadow = el.createShadowRoot();
-
     _clear(el);
-    _clear(shadow);
+    _clear(root);
 
     // SEE THIS:
     // http://ejohn.org/blog/dom-documentfragments/
-    for (var sub = 0; sub < data.length; ++sub) {
+    for (var sub = 0; sub < value.length; ++sub) {
       var clone = document.importNode(tpl.content, true);
+
       // NOTE: an element can no longer have multiple shadow roots inside it.
       // This means that all the elements in a list will share the same shadow
       // root, so a <style> element in a template will be added multiple times.
       // It doesn't really break anything, but it's not pretty.
       while (clone.childNodes.length > 0) {
         var s = clone.childNodes[0];
-        if (s.nodeType !== 3 && ('bindval' in s.dataset || 'bind' in s.dataset || 'bindfn' in s.dataset)) {  // TEXT node type.
-          this._bind(data, sub, s);
-        }
-        shadow.appendChild(s);
+        this._bind(value, sub, s, updating);
+
+        root.appendChild(s);
       }
     }
   }
 
-  Bnid2.prototype._bindObject = function(data, node) {
-    this.maybeSaveMapping(data, node);
+  Etch.prototype._bindObject = function(data, key, node, updating) {
+    if (!updating) this.maybeSaveMapping(data, data, key, node);
+    var value = (key != null) ? data[key] : data;
+    if (!updating) this.maybeSaveMapping(value, data, key, node);
 
     var el = node;
-    var isTpl = node.dataset && node.dataset['bindtpl'];
+    var isTpl = node.dataset && node.dataset['etchTpl'];
 
     if (isTpl) {
       _clear(el);
-      var tplSelector = node.dataset['bindtpl'];
+      var tplSelector = node.dataset['etchTpl'];
       var tpl = this.root.querySelector(tplSelector);
       el = document.importNode(tpl.content, true);
     }
 
-    var binds = el.querySelectorAll('[data-bind]');
-    for (var i = 0; i < binds.length; ++i) {
-      var b = binds[i];
-      var property = b.dataset['bind'];
-      this._bind(data, property, b);
-    }
+    this._bindRecursive(value, null, el, updating);
 
     if (isTpl) {
-      if (node.shadowRoot) shadow = node.shadowRoot;
-      else shadow = node.createShadowRoot();
+      var root = node;
+      if (node.dataset['etchShadow'] === "") {
+        if (node.shadowRoot) root = node.shadowRoot;
+        else root = node.createShadowRoot();
+      }
 
-      _clear(shadow);
-      shadow.appendChild(el);
+      _clear(root);
+      root.appendChild(el);
     }
   }
 
-  Bnid2.prototype._bindValue = function(data, key, node) {
-    var v = (key != null) ? data[key] : data;
-    var target = (v instanceof Object && targetKey in v) ? v[targetKey] : v;
+  Etch.prototype._bindValue = function(data, key, node, updating) {
+    if (!updating) this.maybeSaveValueMapping(data, data, key, node);
 
-    var sub = node;
-    var format = sub.dataset['bindformat'];
-    if (format) {
-      var formatters = format.split(',');
+    // We compare key to null, because in the case of an array,
+    // key could be === 0.
+    var value = (key != null) ? data[key] : data;
+    if (!updating) this.maybeSaveMapping(value, data, key, node);
+
+    if (value instanceof Object) {
+      value = value[targetKey];
+    }
+
+    var fn = node.dataset['etchFn'];
+    if (fn) {
+      var formatters = fn.split(',');
       for (var fi = 0; fi < formatters.length; ++fi) {
         var fmt = this.formatters[formatters[fi]];
-        fmt(sub, target, data, key);
+        fmt(node, value, data, key);
       }
     } else {
-      var hasValue = _hasValue(sub);
-      if (hasValue) {
-        sub.value = target || '';
-        if (key != null && !sub.dataset['eventset']) {
-          var t = this;
-          sub.addEventListener('change', function(ev) {
-            data[key] = ev.target.value;
-            t.update(data, key);
-          });
-          sub.dataset['eventset'] = true;
-        }
-      } else {
-        sub.textContent = target;
-      }
+      node.textContent = value;
     }
   }
 
-  Bnid2.prototype._bindFn = function(data, key, node) {
-    this.maybeSaveMapping(data, node);
+  Etch.prototype._bindFn = function(data, key, node, updating) {
+    if (!updating) this.maybeSaveMapping(data, data, key, node);
     var v = (key != null) ? data[key] : data;
     var target = (v instanceof Object && targetKey in v) ? v[targetKey] : v;
-    this.formatters[node.dataset['bindfn']](node, target, data, key);
+    this.formatters[node.dataset['etchFn']](node, target, data, key);
   }
 
-  Bnid2.prototype._bind = function(data, key, node) {
-    var o = (key != null) ? data[key] : data;
+  /*
+  data attributes:
+  - etch-val: binds the value.
+  - etch-each + etch-tpl: binds an array
+  - etch-obj + etch-tpl: binds an object
 
-    var subs = node.querySelectorAll('[data-bindval]');
-    if (subs.length > 0) {
-      for (var i = 0; i < subs.length; ++i) {
-        this._bind(data, key, subs[i]);
+  modifiers:
+  - (none) by default, the string-value is set to textContent
+  - etch-fn : the value is passed to all the registerd functions, instead of being set to textContent.
+  */
+  Etch.prototype._bind = function(data, key, node, updating) {
+    if (!node.dataset) {
+      return;
+    }
+    if ('etchVal' in node.dataset) {
+      let k = node.dataset['etchVal'];
+      this._bindValue(data, k || key, node, updating);
+      this._bindRecursive(data, key, node, updating);
+    } else if ('etchEach' in node.dataset) {
+      let k = node.dataset['etchEach'];
+      this._bindArray(data, k || key, node, updating);
+    } else if ('etchObj' in node.dataset) {
+      let k = node.dataset['etchObj'];
+      this._bindObject(data, k || key, node, updating);
+    } else {
+      this._bindRecursive(data[key], null, node, updating);
+    }
+  }
+
+  Etch.prototype._bindRecursive = function(data, key, node, updating) {
+    for (let child of node.childNodes) {
+      if (child.nodeType !== 3 && child.nodeType !== 8) {  // Not TEXT or COMMENT
+        if ('etchVal' in child.dataset ||
+            'etchEach' in child.dataset ||
+            'etchObj' in child.dataset) {
+          this._bind(data, key, child, updating);
+        } else {
+          this._bindRecursive(data, key, child, updating);
+        }
       }
     }
-
-    if ('bindfn' in node.dataset) {
-      this._bindFn(data, key, node);
-    }
-
-    // First off, before even looking at the type, if there is
-    // a formatter specified, use that.
-    if ('bindformat' in node.dataset) {
-      this._bindValue(data, key, node);
-    } else if (typeof o == 'object' && Array.isArray(o[targetKey])) {
-      this._bindArray(o, node);
-    } else if (typeof o == 'object' && typeof o[targetKey] == 'object') {
-      this._bindObject(o, node);
-    } else if (node.childNodes.length === 0) {
-      this._bindValue(data, key, node);
-    }
+    return;
   }
 
-  Bnid2.prototype.maybeSaveMapping = function(o, node) {
+  Etch.prototype.maybeSaveValueMapping = function(o, data, key, node) {
+    if (!key) return;
+    if (!data[valNodeKey]) data[valNodeKey] = {};
+    if (!data[valNodeKey][key]) data[valNodeKey][key] = new Set();
+    var cb = {data:data,key:key,node:node};
+    data[valNodeKey][key].add(cb)
+  }
+
+  // Says that when o is modified, the function _bind(data, key, node)
+  // should be called.
+  Etch.prototype.maybeSaveMapping = function(o, data, key, node) {
     if (o instanceof Object) {
-      if (node[nodeKey]) {
-        o[nodeKey].add(node);
+      var cb = {data:data,key:key,node:node}
+      console.log("Save mapping:", cb);
+      if (o[nodeKey]) {
+        o[nodeKey].add(cb);
       } else if (!node[nodeKey]) {
         o[nodeKey] = new Set();
-        o[nodeKey].add(node);
+        o[nodeKey].add(cb);
       }
     }
   }
 
-  Bnid2.prototype.update = function(data, key) {
-    var p2 = data[key];
+  Etch.prototype.update = function(data, key) {
+    console.log("Updating", data, key);
+    var cbs = [];
+    if (data[nodeKey]) {
+      for (let cb of data[nodeKey]) {
+        if (!key || cb.key == key) {
+          cbs.push(cb);
+        }
+      }
+    }
 
-    if (p2 && p2[nodeKey] && !data[arrayKey]) {
-      for (let node of p2[nodeKey]) {
-        this._bind(data, key, node);
+    if (data[valNodeKey] && data[valNodeKey][key]) {
+      for (let cb of data[valNodeKey][key]) {
+        cbs.push(cb);
       }
-    } else if (data[nodeKey]) {
-      for (let node of data[nodeKey]) {
-        this._bind(data, null, node);
-      }
+    }
+
+    for (let cb of cbs) {
+      this._bind(cb.data, cb.key, cb.node, true);
     }
   }
 
@@ -229,6 +264,13 @@ var bind = (function() {
       var wrapper = {};
       wrapper[targetKey] = data;
 
+      // set at the end of the function, but captured in the closure for touch().
+      var proxy = null;
+
+      wrapper.touch = function(key) {
+        cb(proxy, key);
+      }
+
       var keys = Object.keys(data);
       for (var ki = 0; ki < keys.length; ++ki) {
         var k = keys[ki];
@@ -236,7 +278,7 @@ var bind = (function() {
       }
 
       var observer = new ObjectObserver(cb);
-      var proxy = new Proxy(wrapper, observer);
+      proxy = new Proxy(wrapper, observer);
       return proxy;
     }
     return data;
@@ -294,7 +336,7 @@ var bind = (function() {
       var r = target.length = value;
       target[targetKey].length = value;
       this.cb(target, null);
-      return r;
+      return true;
     }
 
     var r = (target[property] = deepProxy(value, this.cb));
@@ -341,7 +383,7 @@ var bind = (function() {
     for (var f in defaultFormatters) fmt[f] = defaultFormatters[f];
     for (var f in formatters) fmt[f] = formatters[f];
 
-    var b = new Bnid2(node, fmt);
+    var b = new Etch(node, fmt);
 
     var proxyChange = function(obj, key) {
       b.update(obj, key);
@@ -349,7 +391,7 @@ var bind = (function() {
     };
 
     var proxy = deepProxy(data, proxyChange);
-    b._bind(proxy, null, node);
+    b._bindRecursive(proxy, null, node, false);
 
     return proxy;
   };
