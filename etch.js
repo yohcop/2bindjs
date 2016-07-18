@@ -214,7 +214,6 @@ var etch = (function() {
   Etch.prototype.maybeSaveMapping = function(o, data, key, node) {
     if (o instanceof Object) {
       var cb = {data:data,key:key,node:node}
-      console.log("Save mapping:", cb);
       if (o[nodeKey]) {
         o[nodeKey].add(cb);
       } else if (!node[nodeKey]) {
@@ -225,7 +224,6 @@ var etch = (function() {
   }
 
   Etch.prototype.update = function(data, key) {
-    console.log("Updating", data, key);
     var cbs = [];
     if (data[nodeKey]) {
       for (let cb of data[nodeKey]) {
